@@ -1,0 +1,210 @@
+apiVersion: backstage.io/v1alpha1
+kind: API
+metadata:
+  name: mc-loyalty-rewards-api
+  title: MC Loyalty Rewards API
+  description: Mastercard Loyalty Rewards — points earning, redemption, partner offers, and reward catalog management
+  annotations:
+    github.com/project-slug: MSBXDemo/mc-loyalty-rewards-api
+    mc/cost-center: MC-100042
+    mc/target-cloud: aws
+  links:
+    - url: https://github.com/MSBXDemo/mc-loyalty-rewards-api
+      title: Source Code
+      icon: github
+  tags:
+    - loyalty
+    - rewards
+    - rest
+    - openapi
+spec:
+  type: openapi
+  lifecycle: production
+  owner: group:payments-engineering
+  system: mc-payments-network
+  definition: |
+    openapi: '3.0.3'
+    info:
+      title: MC Loyalty Rewards API
+      description: Points earning, redemption, partner offers, and reward catalog
+      version: '2.1.0'
+      contact:
+        name: payments-engineering
+        email: payments@mastercard.com
+    servers:
+      - url: https://loyalty.mastercard.com/api/v1
+        description: Production
+      - url: https://sandbox.loyalty.mastercard.com/api/v1
+        description: Sandbox
+    paths:
+      /members/{memberId}/balance:
+        get:
+          summary: Get loyalty points balance
+          operationId: getMemberBalance
+          tags: [Members]
+          parameters:
+            - name: memberId
+              in: path
+              required: true
+              schema:
+                type: string
+                example: MC-MBR-9847261
+          responses:
+            '200':
+              description: Points balance
+              content:
+                application/json:
+                  schema:
+                    type: object
+                    properties:
+                      memberId:
+                        type: string
+                      totalPoints:
+                        type: integer
+                        example: 24850
+                      tierStatus:
+                        type: string
+                        enum: [bronze, silver, gold, platinum]
+                        example: gold
+                      pointsExpiringSoon:
+                        type: integer
+                        example: 3200
+                      expiryDate:
+                        type: string
+                        format: date
+                        example: '2026-06-30'
+      /members/{memberId}/earn:
+        post:
+          summary: Earn points from a transaction
+          operationId: earnPoints
+          tags: [Members]
+          parameters:
+            - name: memberId
+              in: path
+              required: true
+              schema:
+                type: string
+          requestBody:
+            required: true
+            content:
+              application/json:
+                schema:
+                  type: object
+                  required: [transactionId, amount, merchantId]
+                  properties:
+                    transactionId:
+                      type: string
+                      example: TXN-2026042900142
+                    amount:
+                      type: number
+                      example: 142.50
+                    currency:
+                      type: string
+                      example: USD
+                    merchantId:
+                      type: string
+                      example: M-8847291
+                    category:
+                      type: string
+                      enum: [dining, travel, retail, grocery, fuel, other]
+                      example: dining
+          responses:
+            '200':
+              description: Points earned
+              content:
+                application/json:
+                  schema:
+                    type: object
+                    properties:
+                      pointsEarned:
+                        type: integer
+                        example: 285
+                      multiplier:
+                        type: number
+                        example: 2.0
+                      reason:
+                        type: string
+                        example: '2x dining bonus'
+                      newBalance:
+                        type: integer
+                        example: 25135
+      /members/{memberId}/redeem:
+        post:
+          summary: Redeem points for a reward
+          operationId: redeemPoints
+          tags: [Members]
+          parameters:
+            - name: memberId
+              in: path
+              required: true
+              schema:
+                type: string
+          requestBody:
+            required: true
+            content:
+              application/json:
+                schema:
+                  type: object
+                  required: [rewardId, pointsCost]
+                  properties:
+                    rewardId:
+                      type: string
+                      example: RWD-FLIGHT-001
+                    pointsCost:
+                      type: integer
+                      example: 15000
+          responses:
+            '200':
+              description: Redemption confirmed
+            '400':
+              description: Insufficient points
+      /rewards/catalog:
+        get:
+          summary: Browse available rewards
+          operationId: getRewardCatalog
+          tags: [Rewards]
+          parameters:
+            - name: category
+              in: query
+              schema:
+                type: string
+                enum: [travel, merchandise, cashback, experiences, gift-cards]
+            - name: maxPoints
+              in: query
+              schema:
+                type: integer
+          responses:
+            '200':
+              description: Reward catalog
+              content:
+                application/json:
+                  schema:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        rewardId:
+                          type: string
+                        name:
+                          type: string
+                        category:
+                          type: string
+                        pointsCost:
+                          type: integer
+                        description:
+                          type: string
+      /partners:
+        get:
+          summary: List partner merchants with bonus multipliers
+          operationId: getPartners
+          tags: [Partners]
+          responses:
+            '200':
+              description: Partner list
+      /health:
+        get:
+          summary: Health check
+          tags: [System]
+          responses:
+            '200':
+              description: Service healthy
